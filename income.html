@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toledo City — Income & Tax Equity Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d0f14;--surface:#161a23;--surface2:#1e2330;
+  --border:#2a3045;--accent:#e8c84a;--text:#e8eaf0;
+  --text2:#8892a4;--green:#3ecf82;--red:#e85a4a;--grey:#555e72;
+  --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans)}
+
+/* Loading */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity 0.5s;}
+.load-title{font-size:22px;font-weight:800;letter-spacing:-0.02em}
+.load-title span{color:var(--accent)}
+.load-bar-wrap{width:260px;height:3px;background:var(--surface2)}
+.load-bar{height:100%;background:var(--accent);width:0%;transition:width 0.3s}
+.load-sub{font-family:var(--mono);font-size:11px;color:var(--text2);text-align:center;max-width:300px;line-height:1.6}
+.load-error{color:var(--red);font-size:12px;text-align:center;max-width:340px;line-height:1.6;display:none}
+
+/* Header */
+header{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:relative;z-index:500;flex-shrink:0;}
+.hlogo{display:flex;align-items:center;gap:12px}
+.hbadge{width:30px;height:30px;background:var(--accent);color:#0d0f14;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.htitle{font-size:13px;font-weight:700;line-height:1.3}
+.htitle span{color:var(--text2);font-weight:400}
+.nav-links{display:flex;gap:6px}
+.nav-link{padding:6px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;text-decoration:none;border:1px solid var(--border);color:var(--text2);transition:all .15s;font-family:var(--sans);}
+.nav-link:hover{border-color:var(--accent);color:var(--accent)}
+.nav-link.active{border-color:var(--accent);color:var(--accent);background:rgba(232,200,74,.07)}
+
+/* Layout */
+.layout{display:flex;height:calc(100vh - 52px)}
+.sidebar{width:290px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.sb-section{padding:14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-section h2{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:10px}
+
+/* Layer controls */
+.layer-btn{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;background:transparent;border:1px solid var(--border);color:var(--text2);font-family:var(--sans);font-size:12px;cursor:pointer;transition:all .15s;margin-bottom:5px;text-align:left;}
+.layer-btn:last-child{margin-bottom:0}
+.layer-btn:hover{border-color:var(--accent);color:var(--text)}
+.layer-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(232,200,74,.07)}
+.ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* Opacity slider */
+.slider-row{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--text2)}
+.slider-row input{flex:1;accent-color:var(--accent)}
+.slider-val{font-family:var(--mono);min-width:30px;text-align:right}
+
+/* Income bracket selector */
+.bracket-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.bracket-btn{padding:5px 6px;background:transparent;border:1px solid var(--border);color:var(--text2);font-family:var(--mono);font-size:9px;cursor:pointer;transition:all .15s;text-align:center;line-height:1.3;}
+.bracket-btn:hover{border-color:var(--accent);color:var(--text)}
+.bracket-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(232,200,74,.07)}
+
+/* Legend */
+.legend-gradient{height:12px;border-radius:2px;margin-bottom:6px}
+.legend-labels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text2)}
+.leg-sep{height:1px;background:var(--border);margin:10px 0}
+.leg-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:5px}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* Tract detail */
+.detail-scroll{flex:1;overflow-y:auto;padding:14px;min-height:0}
+.detail-scroll::-webkit-scrollbar{width:3px}
+.detail-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.no-sel{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--text2);text-align:center;padding:20px}
+.no-sel .icon{font-size:28px;opacity:.25}
+.no-sel p{font-size:12px;line-height:1.6}
+.tract-detail{display:none}
+.d-tract-name{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);margin-bottom:2px}
+.d-geoid{font-size:10px;color:var(--text2);margin-bottom:12px}
+.d-income-big{font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px}
+.d-income-label{font-size:10px;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em}
+.d-card{background:var(--surface2);border:1px solid var(--border);padding:9px;margin-bottom:7px}
+.d-card-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:6px}
+
+/* Income bar chart */
+.inc-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:10px;color:var(--text2);font-family:var(--mono);}
+.inc-bar-label{min-width:80px;font-size:9px}
+.inc-bar-wrap{flex:1;height:8px;background:var(--border);border-radius:1px;overflow:hidden}
+.inc-bar-fill{height:100%;background:var(--accent);border-radius:1px;transition:width .3s}
+.inc-bar-count{min-width:36px;text-align:right;font-size:9px}
+
+/* Equity summary */
+.equity-badge{padding:10px 12px;border:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.eq-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.eq-val{font-family:var(--mono);font-size:14px;font-weight:500}
+.eq-val.grn{color:var(--green)}.eq-val.red{color:var(--red)}.eq-val.neu{color:var(--grey)}
+
+#map{flex:1}
+
+/* Leaflet overrides */
+.leaflet-popup-content-wrapper{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:0!important;box-shadow:0 8px 32px rgba(0,0,0,.6)!important;color:var(--text)!important}
+.leaflet-popup-tip{background:var(--surface)!important}
+.leaflet-popup-content{font-family:var(--mono)!important;font-size:12px!important;margin:12px!important;min-width:190px}
+.p-title{font-size:13px;font-weight:500;color:var(--accent);margin-bottom:8px}
+.p-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--border);font-size:11px}
+.p-row:last-child{border-bottom:none}
+.p-k{color:var(--text2)}.p-v{color:var(--text);font-weight:500}
+.p-v.grn{color:var(--green)}.p-v.red{color:var(--red)}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important}
+
+/* Cluster */
+.marker-cluster-small{background-color:rgba(232,200,74,.12)!important}
+.marker-cluster-small div{background-color:rgba(232,200,74,.7)!important;color:#0d0f14!important;font-family:var(--mono)!important;font-size:11px!important;font-weight:500!important}
+.marker-cluster-medium{background-color:rgba(232,200,74,.09)!important}
+.marker-cluster-medium div{background-color:rgba(232,200,74,.6)!important;color:#0d0f14!important;font-family:var(--mono)!important;font-size:11px!important}
+.marker-cluster-large{background-color:rgba(232,200,74,.07)!important}
+.marker-cluster-large div{background-color:rgba(232,200,74,.5)!important;color:#0d0f14!important;font-family:var(--mono)!important;font-size:11px!important}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-title">Toledo <span>Equity</span> Map</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="lb"></div></div>
+  <div class="load-sub" id="ls">Fetching Census income data for Lucas County…</div>
+  <div class="load-error" id="load-error"></div>
+</div>
+
+<header>
+  <div class="hlogo">
+    <div class="hbadge">TC</div>
+    <div class="htitle">Toledo City <span>/ Income &amp; Tax Equity</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">← Parcel Map</a>
+    <a href="income.html" class="nav-link active">Income Overlay</a>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+
+    <!-- Parcel layer -->
+    <div class="sb-section">
+      <h2>Parcel Layer</h2>
+      <button class="layer-btn active" id="btn-uniform" onclick="setParcelMode('uniform')">
+        <span class="ldot" style="background:#e8c84a"></span>Uniform (all parcels)
+      </button>
+      <button class="layer-btn" id="btn-splitrate" onclick="setParcelMode('splitrate')">
+        <span class="ldot" style="background:#3ecf82"></span>Split Rate Liability
+      </button>
+      <button class="layer-btn" id="btn-hide" onclick="setParcelMode('hide')">
+        <span class="ldot" style="background:#2a3045"></span>Hide Parcels
+      </button>
+    </div>
+
+    <!-- Income overlay -->
+    <div class="sb-section">
+      <h2>Income Overlay (Census Tracts)</h2>
+      <button class="layer-btn active" id="btn-median" onclick="setIncomeMode('median')">
+        <span class="ldot" style="background:#9b59b6"></span>Median Household Income
+      </button>
+      <button class="layer-btn" id="btn-bracket" onclick="setIncomeMode('bracket')">
+        <span class="ldot" style="background:#3498db"></span>Income Bracket Share
+      </button>
+      <button class="layer-btn" id="btn-income-hide" onclick="setIncomeMode('hide')">
+        <span class="ldot" style="background:#2a3045"></span>Hide Income Layer
+      </button>
+    </div>
+
+    <!-- Bracket selector (shown when bracket mode active) -->
+    <div class="sb-section" id="bracket-section" style="display:none">
+      <h2>Select Bracket</h2>
+      <div class="bracket-grid" id="bracket-grid"></div>
+    </div>
+
+    <!-- Opacity -->
+    <div class="sb-section">
+      <h2>Income Layer Opacity</h2>
+      <div class="slider-row">
+        <span>Low</span>
+        <input type="range" id="opacity-slider" min="10" max="90" value="55" oninput="updateOpacity(this.value)">
+        <span>High</span>
+        <span class="slider-val" id="opacity-val">55%</span>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="sb-section">
+      <h2>Legend</h2>
+      <div id="legend-median">
+        <div class="legend-gradient" id="income-gradient" style="background:linear-gradient(to right,#1a0533,#4a1080,#8e44ad,#e8c84a,#f5f5f5)"></div>
+        <div class="legend-labels"><span>$0</span><span>Median HH Income</span><span>$120k+</span></div>
+        <div class="leg-sep"></div>
+      </div>
+      <div id="legend-bracket" style="display:none">
+        <div class="legend-gradient" style="background:linear-gradient(to right,#eff3ff,#3498db,#0a2a6e)"></div>
+        <div class="legend-labels"><span>0%</span><span>% of households</span><span>40%+</span></div>
+        <div class="leg-sep"></div>
+      </div>
+      <div id="legend-parcels">
+        <div class="leg-row" id="leg-uniform"><div class="leg-dot" style="background:#e8c84a"></div><span>All parcels</span></div>
+        <div id="leg-split" style="display:none">
+          <div class="leg-row"><div class="leg-dot" style="background:#3ecf82"></div><span>Tax decrease (split rate)</span></div>
+          <div class="leg-row"><div class="leg-dot" style="background:#e85a4a"></div><span>Tax increase (split rate)</span></div>
+          <div class="leg-row"><div class="leg-dot" style="background:#555e72"></div><span>No change</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tract detail panel -->
+    <div class="detail-scroll">
+      <div class="no-sel" id="no-sel">
+        <div class="icon">◎</div>
+        <p>Click a census tract to see income distribution and split rate equity analysis</p>
+      </div>
+      <div class="tract-detail" id="tract-detail">
+        <div class="d-tract-name" id="d-name"></div>
+        <div class="d-geoid" id="d-geoid"></div>
+        <div class="d-income-big" id="d-income"></div>
+        <div class="d-income-label">Median Household Income (ACS 2022)</div>
+
+        <!-- Equity summary for this tract -->
+        <div class="d-card" id="equity-card">
+          <div class="d-card-lbl">Split Rate Equity — Parcels in this Tract</div>
+          <div class="equity-badge">
+            <div><div class="eq-label">Pay Less</div></div>
+            <div class="eq-val grn" id="eq-green">—</div>
+          </div>
+          <div class="equity-badge">
+            <div><div class="eq-label">Pay More</div></div>
+            <div class="eq-val red" id="eq-red">—</div>
+          </div>
+          <div class="equity-badge" style="margin-bottom:0">
+            <div><div class="eq-label">No Change</div></div>
+            <div class="eq-val neu" id="eq-grey">—</div>
+          </div>
+        </div>
+
+        <!-- Income distribution bars -->
+        <div class="d-card">
+          <div class="d-card-lbl">Household Income Distribution</div>
+          <div id="income-bars"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+// ── Config ──────────────────────────────────────────────────
+var STATE = '39', COUNTY = '095'; // Ohio, Lucas County
+var TRACT_OPACITY = 0.55;
+var parcelMode = 'uniform';
+var incomeMode = 'median';
+var selectedBracket = 2; // index into BRACKETS
+
+var BRACKETS = [
+  {key:'B19001_002E', label:'<$10k'},
+  {key:'B19001_003E', label:'$10-15k'},
+  {key:'B19001_004E', label:'$15-20k'},
+  {key:'B19001_005E', label:'$20-25k'},
+  {key:'B19001_006E', label:'$25-30k'},
+  {key:'B19001_007E', label:'$30-35k'},
+  {key:'B19001_008E', label:'$35-40k'},
+  {key:'B19001_009E', label:'$40-45k'},
+  {key:'B19001_010E', label:'$45-50k'},
+  {key:'B19001_011E', label:'$50-60k'},
+  {key:'B19001_012E', label:'$60-75k'},
+  {key:'B19001_013E', label:'$75-100k'},
+  {key:'B19001_014E', label:'$100-125k'},
+  {key:'B19001_015E', label:'$125-150k'},
+  {key:'B19001_016E', label:'$150-200k'},
+  {key:'B19001_017E', label:'>$200k'}
+];
+
+// State
+var map, tractLayer, clusterGroup;
+var tractData = {};   // geoid -> {median, total, brackets:[...], name}
+var allMarkers = [];
+var parcelDataLoaded = false;
+
+// ── Helpers ──────────────────────────────────────────────────
+function fmt(n){ return n == null || n < 0 ? 'N/A' : '$' + Number(n).toLocaleString(); }
+function fmtF(n){ return n == null ? '—' : '$' + Number(n).toFixed(2); }
+function pct(a,b){ return b > 0 ? Math.round(a/b*100) : 0; }
+
+function setProgress(p, msg){
+  document.getElementById('lb').style.width = p + '%';
+  document.getElementById('ls').textContent = msg;
+}
+
+function showError(msg){
+  document.getElementById('load-error').textContent = msg;
+  document.getElementById('load-error').style.display = 'block';
+}
+
+// ── Color scales ─────────────────────────────────────────────
+function medianIncomeColor(income){
+  if(income < 0) return 'rgba(80,80,80,0.3)';
+  // Deep purple (low) → gold (mid) → near white (high)
+  var stops = [
+    [0,      [26,5,51]],
+    [30000,  [74,16,128]],
+    [50000,  [142,68,173]],
+    [75000,  [232,200,74]],
+    [120000, [245,245,245]]
+  ];
+  var lo = stops[0], hi = stops[stops.length-1];
+  for(var i=0; i<stops.length-1; i++){
+    if(income >= stops[i][0] && income <= stops[i+1][0]){
+      lo = stops[i]; hi = stops[i+1]; break;
+    }
+  }
+  var t = lo[0]===hi[0] ? 1 : (income-lo[0])/(hi[0]-lo[0]);
+  t = Math.max(0, Math.min(1, t));
+  var r = Math.round(lo[1][0] + (hi[1][0]-lo[1][0])*t);
+  var g = Math.round(lo[1][1] + (hi[1][1]-lo[1][1])*t);
+  var b = Math.round(lo[1][2] + (hi[1][2]-lo[1][2])*t);
+  return 'rgb('+r+','+g+','+b+')';
+}
+
+function bracketShareColor(share){
+  // white → blue → dark blue
+  var t = Math.min(1, share / 0.4);
+  var r = Math.round(239 + (10-239)*t);
+  var g = Math.round(243 + (42-243)*t);
+  var b = Math.round(255 + (110-255)*t);
+  return 'rgb('+r+','+g+','+b+')';
+}
+
+function getTractFillColor(geoid){
+  var d = tractData[geoid];
+  if(!d) return '#1e2330';
+  if(incomeMode === 'median') return medianIncomeColor(d.median);
+  if(incomeMode === 'bracket'){
+    var total = d.total || 1;
+    var count = d.brackets[selectedBracket] || 0;
+    return bracketShareColor(count / total);
+  }
+  return '#1e2330';
+}
+
+// ── Parcel coloring ──────────────────────────────────────────
+function getParcelColor(p){
+  if(parcelMode === 'splitrate'){
+    var lib = p[10];
+    if(lib > 0.01)  return '#e85a4a';
+    if(lib < -0.01) return '#3ecf82';
+    return '#555e72';
+  }
+  return '#e8c84a';
+}
+
+// ── Tract layer ──────────────────────────────────────────────
+function buildTractLayer(geojson){
+  if(tractLayer) map.removeLayer(tractLayer);
+  if(incomeMode === 'hide'){ tractLayer = null; return; }
+
+  tractLayer = L.geoJSON(geojson, {
+    style: function(feature){
+      var geoid = feature.properties.GEOID || feature.properties.geoid;
+      return {
+        fillColor:   getTractFillColor(geoid),
+        fillOpacity: TRACT_OPACITY,
+        color:       '#2a3045',
+        weight:      1,
+        opacity:     0.6
+      };
+    },
+    onEachFeature: function(feature, layer){
+      var geoid = feature.properties.GEOID || feature.properties.geoid;
+      layer.on('click', function(e){
+        L.DomEvent.stopPropagation(e);
+        showTractDetail(geoid, layer);
+      });
+      layer.on('mouseover', function(){
+        layer.setStyle({weight:2, color:'#e8c84a', opacity:1});
+      });
+      layer.on('mouseout', function(){
+        layer.setStyle({weight:1, color:'#2a3045', opacity:0.6});
+      });
+    }
+  }).addTo(map);
+}
+
+function refreshTractColors(){
+  if(!tractLayer) return;
+  tractLayer.eachLayer(function(layer){
+    var geoid = layer.feature.properties.GEOID || layer.feature.properties.geoid;
+    layer.setStyle({
+      fillColor:   getTractFillColor(geoid),
+      fillOpacity: TRACT_OPACITY
+    });
+  });
+}
+
+// ── Tract detail panel ───────────────────────────────────────
+function showTractDetail(geoid, layer){
+  var d = tractData[geoid];
+  if(!d) return;
+
+  document.getElementById('no-sel').style.display = 'none';
+  document.getElementById('tract-detail').style.display = 'block';
+
+  document.getElementById('d-name').textContent = d.name || 'Census Tract';
+  document.getElementById('d-geoid').textContent = 'GEOID: ' + geoid;
+  document.getElementById('d-income').textContent = d.median > 0 ? fmt(d.median) : 'N/A';
+
+  // Income distribution bars
+  var maxCount = Math.max.apply(null, d.brackets);
+  var barsHTML = '';
+  BRACKETS.forEach(function(br, i){
+    var count = d.brackets[i] || 0;
+    var barPct = maxCount > 0 ? Math.round(count/maxCount*100) : 0;
+    var sharePct = d.total > 0 ? (count/d.total*100).toFixed(1) : '0';
+    barsHTML +=
+      '<div class="inc-bar-row">'+
+        '<div class="inc-bar-label">'+br.label+'</div>'+
+        '<div class="inc-bar-wrap"><div class="inc-bar-fill" style="width:'+barPct+'%"></div></div>'+
+        '<div class="inc-bar-count">'+sharePct+'%</div>'+
+      '</div>';
+  });
+  document.getElementById('income-bars').innerHTML = barsHTML;
+
+  // Equity: count parcels in this tract by liability
+  if(parcelDataLoaded && window.PARCEL_DATA){
+    var bounds = layer.getBounds();
+    var nGreen=0, nRed=0, nGrey=0;
+    window.PARCEL_DATA.forEach(function(p){
+      if(!bounds.contains([p[1],p[2]])) return;
+      var lib = p[10];
+      if(lib > 0.01)       nRed++;
+      else if(lib < -0.01) nGreen++;
+      else                 nGrey++;
+    });
+    var total = nGreen+nRed+nGrey;
+    document.getElementById('eq-green').textContent = nGreen.toLocaleString() + ' (' + pct(nGreen,total) + '%)';
+    document.getElementById('eq-red').textContent   = nRed.toLocaleString()   + ' (' + pct(nRed,total)   + '%)';
+    document.getElementById('eq-grey').textContent  = nGrey.toLocaleString()  + ' (' + pct(nGrey,total)  + '%)';
+    document.getElementById('equity-card').style.display = 'block';
+  } else {
+    document.getElementById('equity-card').style.display = 'none';
+  }
+}
+
+// ── Mode setters ─────────────────────────────────────────────
+function setParcelMode(mode){
+  parcelMode = mode;
+  ['uniform','splitrate','hide'].forEach(function(m){
+    document.getElementById('btn-'+m).classList.toggle('active', m===mode);
+  });
+  document.getElementById('leg-uniform').style.display = mode==='uniform' ? 'flex':'none';
+  document.getElementById('leg-split').style.display   = mode==='splitrate' ? 'block':'none';
+
+  if(mode === 'hide'){
+    if(clusterGroup) map.removeLayer(clusterGroup);
+  } else {
+    if(clusterGroup && !map.hasLayer(clusterGroup)) map.addLayer(clusterGroup);
+    allMarkers.forEach(function(item){
+      var c = getParcelColor(item.p);
+      item.m.setStyle({fillColor:c, color:c, fillOpacity: mode==='splitrate'?0.92:0.85});
+    });
+  }
+}
+
+function setIncomeMode(mode){
+  incomeMode = mode;
+  ['median','bracket','hide'].forEach(function(m){
+    var btn = document.getElementById('btn-'+(m==='hide'?'income-hide':m));
+    if(btn) btn.classList.toggle('active', m===mode);
+  });
+  document.getElementById('bracket-section').style.display = mode==='bracket'?'block':'none';
+  document.getElementById('legend-median').style.display   = mode==='median'?'block':'none';
+  document.getElementById('legend-bracket').style.display  = mode==='bracket'?'block':'none';
+
+  if(mode==='hide'){ if(tractLayer){ map.removeLayer(tractLayer); tractLayer=null; } return; }
+  if(!window._geojsonCache){ return; }
+  buildTractLayer(window._geojsonCache);
+}
+
+function updateOpacity(val){
+  TRACT_OPACITY = val / 100;
+  document.getElementById('opacity-val').textContent = val + '%';
+  refreshTractColors();
+}
+
+// ── Build bracket buttons ────────────────────────────────────
+function buildBracketButtons(){
+  var grid = document.getElementById('bracket-grid');
+  BRACKETS.forEach(function(br, i){
+    var btn = document.createElement('button');
+    btn.className = 'bracket-btn' + (i===selectedBracket?' active':'');
+    btn.textContent = br.label;
+    btn.onclick = function(){
+      selectedBracket = i;
+      document.querySelectorAll('.bracket-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      refreshTractColors();
+    };
+    grid.appendChild(btn);
+  });
+}
+
+// ── Load parcel data ─────────────────────────────────────────
+function loadParcelData(){
+  return new Promise(function(resolve){
+    if(window.PARCEL_DATA){ parcelDataLoaded=true; resolve(); return; }
+    var s = document.createElement('script');
+    s.src = 'parcel_data.js';
+    s.onload = function(){ parcelDataLoaded=true; resolve(); };
+    s.onerror = function(){ resolve(); }; // non-fatal
+    document.head.appendChild(s);
+  });
+}
+
+// ── Add parcels to map ───────────────────────────────────────
+function addParcels(){
+  if(!window.PARCEL_DATA) return;
+  clusterGroup = L.markerClusterGroup({
+    maxClusterRadius:50, disableClusteringAtZoom:15,
+    chunkedLoading:true, chunkInterval:100, chunkDelay:20
+  });
+  var i=0, CHUNK=3000, total=window.PARCEL_DATA.length;
+  function addChunk(){
+    var end=Math.min(i+CHUNK,total), batch=[];
+    for(;i<end;i++){
+      var p=window.PARCEL_DATA[i];
+      var c=getParcelColor(p);
+      var m=L.circleMarker([p[1],p[2]],{radius:3,fillColor:c,color:c,weight:0,fillOpacity:0.8});
+      (function(marker,parcel){
+        marker.on('click',function(e){
+          L.DomEvent.stopPropagation(e);
+          marker.bindPopup(
+            '<div class="p-title">#'+parcel[0]+'</div>'+
+            '<div class="p-row"><span class="p-k">Land</span><span class="p-v">'+fmtF(parcel[3])+'</span></div>'+
+            '<div class="p-row"><span class="p-k">Building</span><span class="p-v">'+fmtF(parcel[4])+'</span></div>'+
+            '<div class="p-row"><span class="p-k">Uniform Tax</span><span class="p-v">'+fmtF(parcel[8])+'</span></div>'+
+            '<div class="p-row"><span class="p-k">Split Rate Tax</span><span class="p-v">'+fmtF(parcel[9])+'</span></div>'+
+            '<div class="p-row"><span class="p-k">Liability</span><span class="p-v '+(parcel[10]>0.01?'red':parcel[10]<-0.01?'grn':'')+'">'+
+              (parcel[10]>=0?'+':'')+fmtF(parcel[10])+'</span></div>',
+            {maxWidth:230}
+          ).openPopup();
+        });
+      })(m,p);
+      batch.push(m);
+      allMarkers.push({m:m,p:p});
+    }
+    clusterGroup.addLayers(batch);
+    if(i<total) setTimeout(addChunk,10);
+  }
+  addChunk();
+  map.addLayer(clusterGroup);
+}
+
+// ── Fetch Census data ────────────────────────────────────────
+function fetchCensusData(){
+  var vars = ['NAME','B19013_001E','B19001_001E'];
+  BRACKETS.forEach(function(br){ vars.push(br.key); });
+  var url = 'https://api.census.gov/data/2022/acs/acs5?get='+vars.join(',')+
+            '&for=tract:*&in=state:'+STATE+'%20county:'+COUNTY;
+
+  return fetch(url)
+    .then(function(r){ if(!r.ok) throw new Error('Census API: '+r.status); return r.json(); })
+    .then(function(rows){
+      var headers = rows[0];
+      rows.slice(1).forEach(function(row){
+        var obj = {};
+        headers.forEach(function(h,i){ obj[h]=row[i]; });
+        var geoid = STATE + COUNTY + obj.tract;
+        var brCounts = BRACKETS.map(function(br){ return Math.max(0, parseInt(obj[br.key])||0); });
+        tractData[geoid] = {
+          name:     obj.NAME,
+          median:   parseInt(obj.B19013_001E) || -1,
+          total:    parseInt(obj.B19001_001E) || 0,
+          brackets: brCounts
+        };
+      });
+    });
+}
+
+// ── Fetch tract boundaries ───────────────────────────────────
+function fetchTractBoundaries(){
+  // Census TIGER cartographic boundary file for Ohio tracts
+  var url = 'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json';
+
+  // Use Census TIGERweb REST API which supports CORS
+  var tigerUrl = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/8/query'+
+    '?where=STATE%3D%2739%27+AND+COUNTY%3D%27095%27'+
+    '&outFields=GEOID,NAME,TRACT'+
+    '&f=geojson'+
+    '&outSR=4326'+
+    '&resultRecordCount=500';
+
+  return fetch(tigerUrl)
+    .then(function(r){ if(!r.ok) throw new Error('TIGER: '+r.status); return r.json(); })
+    .then(function(geojson){
+      if(!geojson.features || geojson.features.length === 0)
+        throw new Error('No tract features returned');
+      return geojson;
+    });
+}
+
+// ── Main init ────────────────────────────────────────────────
+window.onload = function(){
+  buildBracketButtons();
+
+  map = L.map('map',{center:[41.6663,-83.5883],zoom:12,preferCanvas:true});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; OpenStreetMap &copy; CartoDB', maxZoom:19
+  }).addTo(map);
+
+  setProgress(10, 'Fetching Census income data…');
+
+  // Fetch income data + boundaries in parallel
+  Promise.all([
+    fetchCensusData().then(function(){ setProgress(40,'Income data loaded…'); }),
+    fetchTractBoundaries().then(function(geo){ window._geojsonCache=geo; setProgress(70,'Tract boundaries loaded…'); }),
+    loadParcelData().then(function(){ setProgress(85,'Parcel data loaded…'); })
+  ])
+  .then(function(){
+    setProgress(95,'Rendering map…');
+    buildTractLayer(window._geojsonCache);
+    addParcels();
+    setProgress(100,'Done!');
+    var el = document.getElementById('loading');
+    el.style.opacity='0';
+    setTimeout(function(){el.style.display='none';},500);
+  })
+  .catch(function(err){
+    console.error(err);
+    // Try to show something even if one source fails
+    setProgress(100,'Partial load — some data unavailable');
+    showError('Note: '+err.message+'. Map showing available data. Check console for details.');
+    if(window._geojsonCache && Object.keys(tractData).length>0) buildTractLayer(window._geojsonCache);
+    if(window.PARCEL_DATA) addParcels();
+    var el=document.getElementById('loading');
+    el.style.opacity='0';
+    setTimeout(function(){el.style.display='none';},2000);
+  });
+};
+</script>
+</body>
+</html>
