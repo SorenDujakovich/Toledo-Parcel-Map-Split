@@ -92,6 +92,10 @@ header{height:52px;background:var(--surface);border-bottom:1px solid var(--borde
 .p-v.grn{color:var(--green)}.p-v.red{color:var(--red)}.p-v.gry{color:var(--grey)}
 .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
 .leaflet-control-zoom a:hover{background:var(--surface2)!important;color:var(--accent)!important}
+.nav-links{display:flex;gap:6px}
+.nav-link{padding:6px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;text-decoration:none;border:1px solid var(--border);color:var(--text2);transition:all .15s;font-family:var(--sans);}
+.nav-link:hover{border-color:var(--accent);color:var(--accent)}
+.nav-link.cur{border-color:var(--accent);color:var(--accent);background:rgba(232,200,74,.07)}
 </style>
 </head>
 <body>
@@ -106,6 +110,10 @@ header{height:52px;background:var(--surface);border-bottom:1px solid var(--borde
   <div class="hlogo">
     <div class="hbadge">TC</div>
     <div class="htitle">Toledo City <span>/ Parcel Map</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link cur">Parcel Map</a>
+    <a href="income.html" class="nav-link">Income Equity →</a>
   </div>
   <div class="hstats">
     <div class="hstat"><span class="hstat-val" id="st-total">—</span><span class="hstat-lbl">Total Parcels</span></div>
